@@ -4,6 +4,8 @@ import torch
 from transformer_block import TransformerBlock
 from transformer_block import embed_dim
 
+from my_utils import get_vmem_str
+
 n_layers = 6
 
 
@@ -20,7 +22,9 @@ class ThinkingMtpMainModel(nn.Module):
     def __init__(self, embedding_layer):
         super().__init__()
         self.embedding_layer = embedding_layer
-        self.blocks = nn.ModuleList([TransformerBlock() for _ in range(n_layers)])
+        print('ThinkingMtpMainModel init: before: ' + get_vmem_str())
+        self.blocks = nn.ModuleList([TransformerBlock().cuda() for _ in range(n_layers)])
+        print('ThinkingMtpMainModel init: after: ' + get_vmem_str())
 
     def forward(self, x, mask=None):
         print('ThinkingMtpMainModel input ' + str(x.shape))
@@ -76,10 +80,12 @@ class ThinkingMtpModule(nn.Module):
     def __init__(self, embedding_layer):
         super().__init__()
         self.embedding_layer = embedding_layer
-        self.blocks = nn.ModuleList([TransformerBlock() for _ in range(n_layers)])
+        print('ThinkingMtpModule init: before: ' + get_vmem_str())
+        self.blocks = nn.ModuleList([TransformerBlock().cuda() for _ in range(n_layers)])
+        print('ThinkingMtpModule init: after: ' + get_vmem_str())
 
-        self.rms_norm_left = RMSNorm(1)
-        self.rms_norm_right = RMSNorm(1)
+        self.rms_norm_left = RMSNorm(embed_dim)
+        self.rms_norm_right = RMSNorm(embed_dim)
 
         self.linear_projection = MTPLinearProjection(embed_dim)
 
@@ -87,5 +93,6 @@ class ThinkingMtpModule(nn.Module):
     def forward(self, x, prev, mask=None):
         h = self.linear_projection(self.rms_norm_left(prev), self.rms_norm_right(x))
         for block in self.blocks:
+            print('ThinkingMtpModule forward: data shape ' + str(h.shape))
             h = block(h, mask)
         return h
